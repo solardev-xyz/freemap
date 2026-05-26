@@ -1,0 +1,11 @@
+{
+  "name": "freemap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FreeMap — Swarm-hosted OpenStreetMap viewer",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.mjs",
+    "serve": "python3 -m http.server 8766 --directory site"
+  }
+}

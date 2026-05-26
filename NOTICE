@@ -1,0 +1,23 @@
+# Third-party notices
+
+## Leaflet 1.9.4
+
+- Files: `site/leaflet.js`, `site/leaflet.css`, `site/images/`
+- License: [BSD 2-Clause](https://github.com/Leaflet/Leaflet/blob/v1.9.4/LICENSE)
+- Project: https://leafletjs.com/
+
+## Leaflet.TileLayer.Fallback 1.0.4
+
+- File: `site/leaflet.tilelayer.fallback.js`
+- License: Apache-2.0
+- Author: Boris Seang
+
+## OpenStreetMap data
+
+Map tiles are rendered from OpenStreetMap data. © OpenStreetMap contributors.
+See https://www.openstreetmap.org/copyright
+
+## Swarm
+
+Tiles are stored and served via the Ethereum Swarm network.
+See https://www.ethswarm.org/

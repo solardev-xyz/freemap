@@ -55,20 +55,17 @@ async function main() {
 		pass(file)
 	}
 
-	// 2. Default tile manifest from config.js (last entry in testnetRoots)
+	// 2. Tile manifest from config.js
 	const config = await fetchStatus(`${SITE_URL}/config.js`)
-	const rootsMatch = config.body.match(/testnetRoots:\s*\[([\s\S]*?)\],/)
-	if (!rootsMatch) fail('could not parse testnetRoots from config.js')
+	const rootMatch = config.body.match(/tileRoot:\s*'([a-fA-F0-9]{64})'/)
+	if (!rootMatch) fail('could not parse tileRoot from config.js')
 
-	const hashes = [...rootsMatch[1].matchAll(/'([a-fA-F0-9]{64})'/g)].map((m) => m[1])
-	if (hashes.length === 0) fail('no manifest hashes in testnetRoots')
-
-	const defaultRef = hashes[hashes.length - 1]
-	pass(`default manifest ${defaultRef.slice(0, 8)}…`)
+	const tileRoot = rootMatch[1]
+	pass(`tile manifest ${tileRoot.slice(0, 8)}…`)
 
 	// 3. Bee tile
 	const { z, x, y } = SAMPLE_TILE
-	const tileUrl = `${BEE_URL}/bzz/${defaultRef}/${z}/${x}/${y}.png`
+	const tileUrl = `${BEE_URL}/bzz/${tileRoot}/${z}/${x}/${y}.png`
 	const tile = await fetch(`${tileUrl}`, { signal: AbortSignal.timeout(60_000) })
 	if (!tile.ok) {
 		fail(`tile ${tile.status} from Bee — is the node running? ${tileUrl}`)

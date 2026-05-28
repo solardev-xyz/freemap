@@ -42,10 +42,8 @@ Override endpoints: `SITE_URL=http://127.0.0.1:8766 BEE_URL=http://127.0.0.1:163
 |-----------|-------------|
 | `lat`, `lon` | Initial map center (skips geolocation) |
 | `zoom`, `minzoom`, `maxzoom`, `maxnativezoom`, `singlezoom` | Zoom levels |
-| `mainnet` | Use mainnet tile manifest list (default: testnet) |
 | `bee` | Bee gateway URL for off-gateway hosting (default `http://127.0.0.1:1633`) |
-| `alllayers` | List every manifest from `config.js`, including ones your node cannot load |
-| `debug` | Log diagnostics to the console (includes hidden/unavailable layers) |
+| `debug` | Log diagnostics to the console |
 
 ## Deploy to Swarm
 

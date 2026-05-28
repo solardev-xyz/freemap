@@ -9,7 +9,6 @@
 
 	const urlParams = new URLSearchParams(window.location.search)
 	const DEBUG = urlParams.has('debug')
-	const SHOW_ALL_LAYERS = urlParams.has('alllayers')
 
 	function log(...args) {
 		if (DEBUG) console.log(...args)
@@ -62,36 +61,15 @@
 		return bzzResourceRoot(reference) + path
 	}
 
-	function latLonToTileXY(lat, lon, z) {
-		const n = 2 ** z
-		const x = Math.floor(((lon + 180) / 360) * n)
-		const latRad = (lat * Math.PI) / 180
-		const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
-		return { z, x, y }
-	}
-
-	async function layerTilesReachable(reference, z, x, y) {
-		const url = resourceUrl(reference, `${z}/${x}/${y}.png`)
-		try {
-			const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
-			return res.ok
-		} catch (e) {
-			log(`Layer ${reference}: tile probe error`, e)
-			return false
-		}
-	}
-
-	const isMainnet = urlParams.has('mainnet')
-	const urlRoots = isMainnet ? cfg.mainnetRoots : cfg.testnetRoots
-	const DEFAULT_TILES_REFERENCE = urlRoots[urlRoots.length - 1]
+	const TILE_ROOT = cfg.tileRoot
 
 	if (proto === 'file:' && !bzzReference) {
-		bzzReference = DEFAULT_TILES_REFERENCE
+		bzzReference = TILE_ROOT
 		bzzRoot = `/bzz/${bzzReference}/`
 		urlServer = urlParams.get('bee') || cfg.defaultBeeGateway
 	}
 
-	log('location', { href: window.location.href, proto, bzzReference, bzzRoot, urlServer, defaultTiles: DEFAULT_TILES_REFERENCE })
+	log('location', { href: window.location.href, proto, bzzReference, bzzRoot, urlServer, tileRoot: TILE_ROOT })
 
 	const defLat = cfg.defaultLat
 	const defLon = cfg.defaultLon
@@ -100,7 +78,6 @@
 	let minZoom = 0
 	let maxZoom = 18
 	let maxNativeZoom = 18
-	let currentLayer
 
 	if (urlParams.has('singlezoom') && !Number.isNaN(+urlParams.get('singlezoom'))) {
 		zoom = minZoom = maxZoom = maxNativeZoom = +urlParams.get('singlezoom')
@@ -139,7 +116,6 @@
 	}
 
 	function makeMap(lat, lon) {
-		let layer
 		const mymap = L.map('mapid')
 		let zoomMetadataTimer = null
 
@@ -147,13 +123,6 @@
 			if (currentAttribution) mymap.attributionControl.removeAttribution(currentAttribution)
 			if (text) mymap.attributionControl.addAttribution(text)
 			currentAttribution = text
-		}
-
-		function layerLabel(reference, modified) {
-			const shortRef = `${reference.slice(0, 8)}…`
-			if (!modified) return isMainnet ? shortRef : `${shortRef} ${reference}`
-			const date = modified.toISOString().substring(0, 10)
-			return isMainnet ? date : `${date} ${reference}`
 		}
 
 		async function getLatestModified(url) {
@@ -190,104 +159,33 @@
 				}, 1000)
 			}
 
-			if (currentLayer !== layer) return
-
 			clearTimeout(zoomMetadataTimer)
 			zoomMetadataTimer = window.setTimeout(async function () {
-				if (zoomLevel !== mymap.getZoom() || currentLayer !== layer) return
-				const ref = layer.reference || DEFAULT_TILES_REFERENCE
-				const latestModified = await getLatestModified(resourceUrl(ref, `${zoomLevel}/update.json`))
-				if (currentLayer === layer) setZoomUpdate(zoomLevel, latestModified)
+				if (zoomLevel !== mymap.getZoom()) return
+				const latestModified = await getLatestModified(resourceUrl(TILE_ROOT, `${zoomLevel}/update.json`))
+				setZoomUpdate(zoomLevel, latestModified)
 			}, ZOOM_METADATA_DELAY_MS)
 		}
 
 		const osmAttribution = 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
 			'<a href="https://www.ethswarm.org/">Swarm</a>'
 
-		function createTileLayer(tileTemplate, reference, modified) {
-			const options = {
-				id: modified ? modified.toISOString() + ' ' + reference : reference,
-				minZoom,
-				maxZoom,
-				maxNativeZoom,
-				attribution: osmAttribution,
-			}
-			const created = (minZoom === maxZoom && maxZoom === maxNativeZoom)
-				? L.tileLayer(tileTemplate, options)
-				: L.tileLayer.fallback(tileTemplate, options)
-			created.reference = reference
-			if (modified) created.latestUpdated = modified
-			return created
+		const tileTemplate = resourceUrl(TILE_ROOT, '{z}/{x}/{y}.png')
+		const tileOptions = {
+			id: TILE_ROOT,
+			minZoom,
+			maxZoom,
+			maxNativeZoom,
+			attribution: osmAttribution,
 		}
-
-		layer = createTileLayer(
-			resourceUrl(DEFAULT_TILES_REFERENCE, '{z}/{x}/{y}.png'),
-			DEFAULT_TILES_REFERENCE
-		)
+		const layer = (minZoom === maxZoom && maxZoom === maxNativeZoom)
+			? L.tileLayer(tileTemplate, tileOptions)
+			: L.tileLayer.fallback(tileTemplate, tileOptions)
 		layer.addTo(mymap)
-		currentLayer = layer
 
 		mymap.on('zoomend', function () { getZoomUpdate(mymap.getZoom()) })
 		mymap.setView([lat, lon], zoom)
 
-		async function addLayers() {
-			const layerControl = L.control.layers(null, null, {
-				collapsed: true,
-				hideSingleBase: false,
-				position: 'topright',
-			})
-			layerControl.addTo(mymap)
-			mymap.on('baselayerchange', function (e) {
-				currentLayer = e.layer
-				layer = e.layer
-				getZoomUpdate(mymap.getZoom())
-			})
-
-			const defaultUpdated = await getLatestModified(resourceUrl(DEFAULT_TILES_REFERENCE, `${maxNativeZoom}/update.json`))
-			layerControl.addBaseLayer(layer, layerLabel(DEFAULT_TILES_REFERENCE, defaultUpdated))
-
-			async function getLayerModified(reference) {
-				let modified = await getLatestModified(resourceUrl(reference, `${maxNativeZoom}/update.json`))
-				if (modified != null) return modified
-				for (let z = maxNativeZoom - 1; z >= 8; z--) {
-					modified = await getLatestModified(resourceUrl(reference, `${z}/update.json`))
-					if (modified != null) return modified
-				}
-				return null
-			}
-
-			function shouldSkipHistorical(reference, latestModified) {
-				if (reference === DEFAULT_TILES_REFERENCE) return true
-				if (!isMainnet || latestModified == null || defaultUpdated == null) return false
-				return latestModified.toISOString().substring(0, 10) === defaultUpdated.toISOString().substring(0, 10)
-			}
-
-			const probe = latLonToTileXY(lat, lon, Math.min(zoom, maxNativeZoom))
-			const historical = urlRoots.filter((ref) => ref !== DEFAULT_TILES_REFERENCE)
-			await Promise.all(historical.map(async (reference) => {
-				const reachable = await layerTilesReachable(reference, probe.z, probe.x, probe.y)
-				if (!reachable) {
-					if (SHOW_ALL_LAYERS) log(`Layer ${reference}: tiles unavailable (listed via alllayers)`)
-					else {
-						log(`Layer ${reference}: hidden (tiles not on this node)`)
-						return
-					}
-				}
-				const latestModified = await getLayerModified(reference)
-				if (latestModified == null && DEBUG) log(`Layer ${reference}: no update.json`)
-				if (shouldSkipHistorical(reference, latestModified)) return
-				let label = layerLabel(reference, latestModified)
-				if (SHOW_ALL_LAYERS && !reachable) label += ' (unavailable)'
-				const historicalLayer = createTileLayer(
-					resourceUrl(reference, '{z}/{x}/{y}.png'),
-					reference,
-					latestModified
-				)
-				layerControl.addBaseLayer(historicalLayer, label)
-			}))
-		}
-
-		addLayers()
 		window.setTimeout(function () { getZoomUpdate(mymap.getZoom()) }, 500)
 	}
 

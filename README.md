@@ -93,7 +93,7 @@ package.json                      # serve + test scripts
 
 ## Provenance
 
-Derived from the community Swarm OSM map viewer (historical manifests in `config.js`). Tile data is content-addressed on Swarm and maintained separately from this shell.
+Derived from the community Swarm OSM map viewer originally authored by [`ldeffenb`](https://github.com/ldeffenb), who built the underlying tile manifests on Swarm. Tile data remains content-addressed on Swarm, independent of this shell.
 
 ## License
 

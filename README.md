@@ -42,8 +42,18 @@ Override endpoints: `SITE_URL=http://127.0.0.1:8766 BEE_URL=http://127.0.0.1:163
 |-----------|-------------|
 | `lat`, `lon` | Initial map center (skips geolocation) |
 | `zoom`, `minzoom`, `maxzoom`, `maxnativezoom`, `singlezoom` | Zoom levels |
-| `bee` | Bee gateway URL for off-gateway hosting (default `http://127.0.0.1:1633`) |
+| `bee` | Bee gateway URL for off-gateway hosting (default `http://127.0.0.1:1633` for local dev, `https://api.gateway.ethswarm.org` for public ENS gateways) |
 | `debug` | Log diagnostics to the console |
+
+## Tile gateway resolution
+
+The viewer picks where to fetch tiles based on how it was loaded:
+
+- `bzz://…/` (Swarm-aware browser) — `bzz://<tileRoot>/…`
+- `https://<gateway>/[<prefix>/]bzz/<shellHash>/` — same gateway and prefix
+- Other public hosts (e.g. ENS gateways) — falls back to `defaultPublicGateway` (`https://api.gateway.ethswarm.org`)
+- `http://localhost:*` / `http://127.0.0.1:*` — `defaultBeeGateway` (`http://127.0.0.1:1633`)
+- `?bee=<url>` overrides any of the above
 
 ## Deploy to Swarm
 

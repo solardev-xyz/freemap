@@ -3,7 +3,7 @@
 
 	const cfg = window.FREEMAP_CONFIG
 	const BZZ_HASH_RE = /^[a-fA-F0-9]{64}([a-fA-F0-9]{64})?$/
-	const BZZ_PATH_RE = /^\/bzz\/([a-fA-F0-9]{64}(?:[a-fA-F0-9]{64})?)\//i
+	const BZZ_PATH_RE = /^(.*?)\/bzz\/([a-fA-F0-9]{64}(?:[a-fA-F0-9]{64})?)\//i
 	const ZOOM_METADATA_DELAY_MS = 400
 	const GEOLOCATION_TIMEOUT_MS = 8000
 
@@ -24,26 +24,34 @@
 		return lower.endsWith('.eth') || lower.endsWith('.box')
 	}
 
+	function isLocalHost(host) {
+		if (!host) return false
+		const lower = host.toLowerCase()
+		return lower === 'localhost' || lower === '127.0.0.1' || lower === '0.0.0.0' || lower.endsWith('.local')
+	}
+
 	const proto = window.location.protocol
 	const pathname = window.location.pathname
+	const host = window.location.hostname
 	const pathMatch = pathname.match(BZZ_PATH_RE)
 
-	let urlServer = cfg.defaultBeeGateway
+	let bzzGatewayBase = cfg.defaultBeeGateway
 	if (urlParams.has('bee')) {
-		urlServer = urlParams.get('bee')
+		bzzGatewayBase = (urlParams.get('bee') || '').replace(/\/$/, '')
 	} else if (proto === 'bzz:') {
-		urlServer = ''
+		bzzGatewayBase = ''
 	} else if ((proto === 'http:' || proto === 'https:') && pathMatch) {
-		urlServer = ''
+		bzzGatewayBase = pathMatch[1] || ''
+	} else if ((proto === 'http:' || proto === 'https:') && !isLocalHost(host)) {
+		bzzGatewayBase = (cfg.defaultPublicGateway || '').replace(/\/$/, '')
 	}
 
 	let bzzReference
 	let bzzRoot = ''
 	if (pathMatch) {
-		bzzReference = pathMatch[1]
-		bzzRoot = `/bzz/${pathMatch[1]}/`
+		bzzReference = pathMatch[2]
+		bzzRoot = `${pathMatch[1]}/bzz/${pathMatch[2]}/`
 	} else if (proto === 'bzz:') {
-		const host = window.location.hostname
 		if (isBzzHash(host)) {
 			bzzReference = host
 		} else if (isEnsHost(host)) {
@@ -53,7 +61,7 @@
 
 	function bzzResourceRoot(reference) {
 		if (proto === 'bzz:') return `bzz://${reference}/`
-		return `${urlServer}/bzz/${reference}/`
+		return `${bzzGatewayBase}/bzz/${reference}/`
 	}
 
 	function resourceUrl(reference, path) {
@@ -66,10 +74,10 @@
 	if (proto === 'file:' && !bzzReference) {
 		bzzReference = TILE_ROOT
 		bzzRoot = `/bzz/${bzzReference}/`
-		urlServer = urlParams.get('bee') || cfg.defaultBeeGateway
+		bzzGatewayBase = (urlParams.get('bee') || cfg.defaultBeeGateway || '').replace(/\/$/, '')
 	}
 
-	log('location', { href: window.location.href, proto, bzzReference, bzzRoot, urlServer, tileRoot: TILE_ROOT })
+	log('location', { href: window.location.href, proto, host, bzzReference, bzzRoot, bzzGatewayBase, tileRoot: TILE_ROOT })
 
 	const defLat = cfg.defaultLat
 	const defLon = cfg.defaultLon
